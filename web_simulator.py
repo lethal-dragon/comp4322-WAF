@@ -9,7 +9,6 @@ from flask import Flask, request, render_template, redirect, url_for, session
 from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'
 
 # WAF State: Initially deactivated
 app.config['WAF_ENABLED'] = False
@@ -50,8 +49,9 @@ def close_connection(exception):
 
 @app.route('/')
 def home():
-    message = request.args.get('message', 'WAF is currently disabled')
-    return render_template('main.html', message=message)
+    message = request.args.get('message')
+    waf_status = "enabled" if app.config['WAF_ENABLED'] else "disabled"
+    return render_template('main.html', message=message, waf_status=waf_status)
 
 
 @app.route('/login', methods=['POST'])
@@ -66,10 +66,14 @@ def login():
     cur.execute(query)
     user = cur.fetchone()
     if user is None:
-        return "User not found"
+        return redirect(url_for('home', login=False))
     else:
-        return "Login successful"
+        return render_template('login_successful.html', login=True)
 
+@app.route('/logout')
+def logout():
+    # Here you would add code to log the user out
+    return redirect(url_for('home'))
 
 @app.route('/search', methods=['GET'])
 @check_waf
@@ -77,10 +81,13 @@ def search():
     query = request.args.get('q')
     db = get_db()
     cur = db.cursor()
-    # Vulnerable to SQL Injection
-    cur.execute(f"SELECT * FROM users WHERE name LIKE '%{query}%'")
-    results = cur.fetchall()
-    return render_template('search.html', results=results)
+    if not query:
+        return render_template('search.html', search_fail=True, results=[])
+    else:
+        # Vulnerable to SQL Injection
+        cur.execute(f"SELECT * FROM users WHERE name LIKE '%{query}%'")
+        results = cur.fetchall()
+        return render_template('search.html', results=results)
 
 @app.route('/load', methods=['GET'])
 def load_file():

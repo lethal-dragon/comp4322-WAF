@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Search Results</title>
+    <title>Search Phone number base on Username</title>
     <style>
         .search-container {
             text-align: center;
@@ -44,7 +44,8 @@
         <button onclick="location.href='{{ url_for('home') }}'">Go to Login</button>
     </div>
     {% for result in results %}
-        <p>{{ result[1] }}</p>  <!-- Assuming the second column in the users table is the user's name -->
+        <p>Name: {{ result[1] }}</p>
+        <p>Phone: {{ result[3] }}</p>
     {% endfor %}
 </body>
 </html>
