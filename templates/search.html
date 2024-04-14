@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Search Results</title>
+    <style>
+        .search-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .search-container input[type=text] {
+            padding: 10px;
+            font-size: 17px;
+            border: 1px solid grey;
+            float: left;
+            width: 60%;
+            background: #f1f1f1;
+        }
+
+        .search-container button {
+            float: left;
+            width: 20%;
+            padding: 10px;
+            background: #2196F3;
+            color: white;
+            font-size: 17px;
+            border: 1px solid grey;
+            border-left: none;
+            cursor: pointer;
+        }
+
+        .search-container button:hover {
+            background: #0b7dda;
+        }
+    </style>
+</head>
+<body>
+    <h1>Search Results</h1>
+    <div class="search-container">
+        <form action="/search" method="get">
+            <input type="text" placeholder="Search.." name="q">
+            <button type="submit">Submit</button>
+        </form>
+        <button onclick="location.href='{{ url_for('home') }}'">Go to Login</button>
+    </div>
+    {% for result in results %}
+        <p>{{ result[1] }}</p>  <!-- Assuming the second column in the users table is the user's name -->
+    {% endfor %}
+</body>
+</html>
