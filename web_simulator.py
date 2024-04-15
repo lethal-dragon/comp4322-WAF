@@ -11,7 +11,14 @@ import os
 app = Flask(__name__)
 app.secret_key = 'comp4322'
 
+# to set the rate limit dynamically
+def dynamic_limit():
+    if app.config['WAF_ENABLED']:
+        return "10/minute"
+
+# Get the remote address of the user as the parameter for rate limiting
 limiter = Limiter(key_func=get_remote_address)
+# Initialize the limiter with the app
 limiter.init_app(app)
 
 DATABASE = 'database.db'
@@ -19,16 +26,13 @@ DATABASE = 'database.db'
 # WAF State: Initially deactivated
 app.config['WAF_ENABLED'] = False
 
-
-def dynamic_limit():
-    if app.config['WAF_ENABLED']:
-        return "15/minute"
-
-
+# Rate limiting: send error meesage when too many requests
 @app.before_request
+@limiter.limit(dynamic_limit, error_message="Too many requests. Please try again later.")
 def before_request():
-    if app.config['WAF_ENABLED']:
-        limiter.limit(dynamic_limit, error_message="Too many requests. Please try again later.")
+    pass
+
+
 
 
 @app.errorhandler(429)
@@ -155,23 +159,24 @@ def load_file():
         return "File not found or access denied"
 
 
+# To simulate a XSS protection
 @app.route('/comment', methods=['GET', 'POST'])
 def comment():
     if request.method == 'POST':
         comment = request.form.get('comment')
-        # Sanitize the user's input to prevent XSS attacks
+        # When the WAF is enabled, the comment is cleaned before being displayed
         if app.config['WAF_ENABLED']:
             safe_comment = clean(comment)
+            # Check if the comment has been modified
             if safe_comment != comment:
-                # If the sanitized comment is different from the original comment,
-                # the original comment contained potentially harmful content
-                flash("Error: Comment contains potentially harmful content")
+                # If the comment has been modified, it is likely that the user has attempted an XSS attack
+                flash("Error: Your action could not be completed")
             else:
-                # If the sanitized comment is the same as the original comment,
-                # the original comment was okay
-                flash("Successfully submitted!")
+                # If the comment has not been modified, it is safe to display
+                flash("Comment successfully submitted!")
         else:
-            flash("Successfully submitted!")
+            # When the WAF is disabled, the comment is submitted no matter what the comment is
+            flash("Comment successfully submitted!")
     return render_template('comment.html')
 
 
