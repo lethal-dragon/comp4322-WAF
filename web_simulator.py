@@ -1,10 +1,8 @@
 import threading
 from collections import defaultdict
-from flask import Flask, request, flash, render_template, g, redirect, url_for, session
+from flask import Flask, request, flash, render_template, g, redirect, url_for
 from functools import wraps
 from bleach import clean
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 import sqlite3
 import os
 import re
@@ -13,24 +11,11 @@ import re
 app = Flask(__name__)
 app.secret_key = 'comp4322'
 
-
-# To set the rate limit dynamically
-def dynamic_limit():
-    if app.config['WAF_ENABLED']:
-        return "10/minute"
-
-
-# Get the remote address of the user as the parameter for rate limiting
-limiter = Limiter(key_func=get_remote_address)
-# Initialize the limiter with the app
-limiter.init_app(app)
-
 # set the path to the database
 DATABASE = 'database.db'
 
 # WAF State: Initially deactivated
 app.config['WAF_ENABLED'] = False
-
 
 # Rate limiting: send error meesage when too many requests
 connection_counts = defaultdict(int)
@@ -38,21 +23,14 @@ connection_lock = threading.Lock()
 
 
 @app.before_request
-@limiter.limit(dynamic_limit, error_message="Too many requests. Please try again later.")
-def before_request():
-    pass
-
-
-
-
-@app.errorhandler(429)
-def ratelimit_handler(e):
+def count_connections():
     if app.config['WAF_ENABLED']:
         ip = request.remote_addr
         with connection_lock:
             connection_counts[ip] += 1
             if connection_counts[ip] > 100:  # Set your threshold here
                 return "Too many connections", 429  # HTTP 429 Too Many Requests
+
 
 # decorator to check if the file access is allowed when WAF is enabled
 def check_file_access(func):
@@ -68,6 +46,7 @@ def check_file_access(func):
         return func(*args, **kwargs)
 
     return decorated_function
+
 
 # define a decorator to check for SQL injection when the WAF is enabled
 def check_sql_injection(func):
@@ -95,6 +74,7 @@ def toggle_waf():
         state = "disabled"
     return redirect(url_for('home', message=f"WAF is now {state}"))
 
+
 # connect to the database
 def get_db():
     db = getattr(g, '_database', None)
@@ -102,12 +82,14 @@ def get_db():
         db = g._database = sqlite3.connect(DATABASE)
     return db
 
+
 # close the database connection
 @app.teardown_appcontext
 def close_connection(exception):
     db = getattr(g, '_database', None)
     if db is not None:
         db.close()
+
 
 # route to home page
 @app.route('/')
@@ -118,6 +100,7 @@ def home():
     else:
         waf_status = "disabled"
     return render_template('main.html', message=message, waf_status=waf_status)
+
 
 # simulate a simple login page and check for SQL injection
 @app.route('/login', methods=['GET', 'POST'])
@@ -132,6 +115,7 @@ def login():
         query = f"SELECT * FROM users WHERE name = '{username}' AND password = '{password}'"
         cur.execute(query)
         user = cur.fetchone()
+        # use 'OR'1'='1 to bypass the login
         if user is None:
             return redirect(url_for('home', login=False))
         else:
@@ -144,6 +128,7 @@ def login():
 def logout():
     return redirect(url_for('home'))
 
+
 # simulate a simple search page and check for SQL injection
 @app.route('/search', methods=['GET'])
 @check_sql_injection
@@ -154,7 +139,7 @@ def search():
     if not query:
         return render_template('search.html', search_fail=True, results=[])
     else:
-        # Vulnerable to SQL Injection
+        # Vulnerable to SQL Injection '%'
         cur.execute(f"SELECT * FROM users WHERE name LIKE '%{query}%'")
         results = cur.fetchall()
         return render_template('search.html', results=results)
