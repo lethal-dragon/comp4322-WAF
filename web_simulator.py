@@ -8,10 +8,11 @@ import re
 import sqlite3
 import os
 
+# create the Flask app
 app = Flask(__name__)
 app.secret_key = 'comp4322'
 
-# to set the rate limit dynamically
+# To set the rate limit dynamically
 def dynamic_limit():
     if app.config['WAF_ENABLED']:
         return "10/minute"
@@ -21,6 +22,7 @@ limiter = Limiter(key_func=get_remote_address)
 # Initialize the limiter with the app
 limiter.init_app(app)
 
+# set the path to the database
 DATABASE = 'database.db'
 
 # WAF State: Initially deactivated
@@ -34,13 +36,13 @@ def before_request():
 
 
 
-
+# Rate liming: send error message when too many requests
 @app.errorhandler(429)
 def ratelimit_handler(e):
     if app.config['WAF_ENABLED']:
         return "Too many requests. Please try again later.", 429
 
-
+# decorator to check if the file access is allowed when WAF is enabled
 def check_file_access(func):
     @wraps(func)
     def decorated_function(*args, **kwargs):
@@ -55,7 +57,7 @@ def check_file_access(func):
 
     return decorated_function
 
-
+# define a decorator to check for SQL injection when the WAF is enabled
 def check_sql_injection(func):
     @wraps(func)
     def decorated_function(*args, **kwargs):
@@ -63,41 +65,49 @@ def check_sql_injection(func):
             sql_injection_patterns = ["'", '"', "--", "/*", "*/", "xp_", "UNION", "SELECT", "DROP", ";", "INSERT",
                                       "DELETE", "UPDATE", "%25", '%']
             for value in list(request.args.values()) + list(request.form.values()):
-                if any(pattern in value for pattern in sql_injection_patterns):
-                    return "Request blocked by WAF due to SQL Injection attempt", 403
+                for pattern in sql_injection_patterns:
+                    if re.search(pattern, value):
+                        return "Request blocked by WAF due to SQL Injection attempt", 403
         return func(*args, **kwargs)
 
     return decorated_function
 
 
+# toggle the state of the WAF (enable/disable)
 @app.route('/toggle_waf')
 def toggle_waf():
     app.config['WAF_ENABLED'] = not app.config['WAF_ENABLED']
-    state = "enabled" if app.config['WAF_ENABLED'] else "disabled"
+    if app.config['WAF_ENABLED']:
+        state = "enabled"
+    else:
+        state = "disabled"
     return redirect(url_for('home', message=f"WAF is now {state}"))
 
-
+# connect to the database
 def get_db():
     db = getattr(g, '_database', None)
     if db is None:
         db = g._database = sqlite3.connect(DATABASE)
     return db
 
-
+# close the database connection
 @app.teardown_appcontext
 def close_connection(exception):
     db = getattr(g, '_database', None)
     if db is not None:
         db.close()
 
-
+# route to home page
 @app.route('/')
 def home():
     message = request.args.get('message')
-    waf_status = "enabled" if app.config['WAF_ENABLED'] else "disabled"
+    if app.config['WAF_ENABLED']:
+        waf_status = "enabled"
+    else:
+        waf_status = "disabled"
     return render_template('main.html', message=message, waf_status=waf_status)
 
-
+# simulate a simple login page and check for SQL injection
 @app.route('/login', methods=['GET', 'POST'])
 @check_sql_injection
 def login():
@@ -120,10 +130,9 @@ def login():
 
 @app.route('/logout')
 def logout():
-    # Here you would add code to log the user out
     return redirect(url_for('home'))
 
-
+# simulate a simple search page and check for SQL injection
 @app.route('/search', methods=['GET'])
 @check_sql_injection
 def search():
@@ -139,6 +148,7 @@ def search():
         return render_template('search.html', results=results)
 
 
+# simulate a simple search page and check for file inclusion
 @app.route('/load', methods=['GET'])
 @check_file_access
 def load_file():
@@ -159,7 +169,7 @@ def load_file():
         return "File not found or access denied"
 
 
-# To simulate a XSS protection
+# Simulate a simple comment page and check for XSS
 @app.route('/comment', methods=['GET', 'POST'])
 def comment():
     if request.method == 'POST':
