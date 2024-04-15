@@ -1,5 +1,6 @@
-from flask import Flask, request, render_template, g, redirect, url_for, session
+from flask import Flask, request, flash, render_template, escape,g, redirect, url_for, session
 from functools import wraps
+from bleach import clean
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import requests
@@ -10,6 +11,7 @@ import os
 
 
 app = Flask(__name__)
+app.secret_key = 'comp4322'
 
 def dynamic_limit():
     if app.config['WAF_ENABLED']:
@@ -82,21 +84,24 @@ def home():
     return render_template('main.html', message=message, waf_status=waf_status)
 
 
-@app.route('/login', methods=['POST'])
+@app.route('/login', methods=['GET', 'POST'])
 @check_waf
 def login():
-    username = request.form['uname']
-    password = request.form['psw']
-    db = get_db()
-    cur = db.cursor()
-    # Directly inserting user input into the SQL query
-    query = f"SELECT * FROM users WHERE name = '{username}' AND password = '{password}'"
-    cur.execute(query)
-    user = cur.fetchone()
-    if user is None:
-        return redirect(url_for('home', login=False))
+    if request.method == 'POST':
+        username = request.form['uname']
+        password = request.form['psw']
+        db = get_db()
+        cur = db.cursor()
+        # Directly inserting user input into the SQL query
+        query = f"SELECT * FROM users WHERE name = '{username}' AND password = '{password}'"
+        cur.execute(query)
+        user = cur.fetchone()
+        if user is None:
+            return redirect(url_for('home', login=False))
+        else:
+            return render_template('login_successful.html', login=True)
     else:
-        return render_template('login_successful.html', login=True)
+        return render_template('main.html')
 
 @app.route('/logout')
 def logout():
@@ -137,11 +142,27 @@ def load_file():
     else:
         return "File not found or access denied"
 
-@app.route('/comment', methods=['POST'])
+
+@app.route('/comment', methods=['GET', 'POST'])
 def comment():
-    comment = request.form.get('comment')
-    # Vulnerable to XSS
-    return render_template('comment.html', comment=comment)
+    if request.method == 'POST':
+        comment = request.form.get('comment')
+        # Sanitize the user's input to prevent XSS attacks
+        if app.config['WAF_ENABLED']:
+            safe_comment = clean(comment)
+            if safe_comment != comment:
+                # If the sanitized comment is different from the original comment,
+                # the original comment contained potentially harmful content
+                flash("Error: Comment contains potentially harmful content")
+            else:
+                # If the sanitized comment is the same as the original comment,
+                # the original comment was okay
+                flash("Successfully submitted!")
+        else:
+            flash("Successfully submitted!")
+    return render_template('comment.html')
+
+
 
 
 
