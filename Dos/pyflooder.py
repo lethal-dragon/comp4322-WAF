@@ -59,7 +59,7 @@ def print_status():
 # Generate URL Path
 def generate_url_path():
     msg = str(string.ascii_letters + string.digits + string.punctuation)
-    data = 'a' * 1000000
+    data = 'a' * 10
     return data
 
 
