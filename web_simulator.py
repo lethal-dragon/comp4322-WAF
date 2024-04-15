@@ -108,9 +108,8 @@ def search():
 def load_file():
     # use http://127.0.0.1:5000/load?file=confidential_files/confidential_1.txt to attack
     filename = request.args.get('file')
-    # Vulnerable to File Inclusion
-    # Directory White-Listing for Safety in Demonstrations
-    base_directory = os.path.abspath('demo_files')  # Absolute path
+    # confidential files are vulnerable to File Inclusion
+    base_directory = os.path.abspath('demo_files')      # White-Listing directory for Safety in Demonstrations
     file_path = os.path.abspath(os.path.join(base_directory, filename))
 
     if file_path.startswith(base_directory) and os.path.isfile(file_path):
