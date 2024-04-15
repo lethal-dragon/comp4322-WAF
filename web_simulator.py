@@ -1,20 +1,22 @@
+import threading
+from collections import defaultdict
 from flask import Flask, request, flash, render_template, g, redirect, url_for, session
 from functools import wraps
 from bleach import clean
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-import requests
-import re
 import sqlite3
 import os
 
 app = Flask(__name__)
 app.secret_key = 'comp4322'
 
+
 # to set the rate limit dynamically
 def dynamic_limit():
     if app.config['WAF_ENABLED']:
         return "10/minute"
+
 
 # Get the remote address of the user as the parameter for rate limiting
 limiter = Limiter(key_func=get_remote_address)
@@ -26,19 +28,20 @@ DATABASE = 'database.db'
 # WAF State: Initially deactivated
 app.config['WAF_ENABLED'] = False
 
+
 # Rate limiting: send error meesage when too many requests
+connection_counts = defaultdict(int)
+connection_lock = threading.Lock()
+
+
 @app.before_request
-@limiter.limit(dynamic_limit, error_message="Too many requests. Please try again later.")
-def before_request():
-    pass
-
-
-
-
-@app.errorhandler(429)
-def ratelimit_handler(e):
+def count_connections():
     if app.config['WAF_ENABLED']:
-        return "Too many requests. Please try again later.", 429
+        ip = request.remote_addr
+        with connection_lock:
+            connection_counts[ip] += 1
+            if connection_counts[ip] > 100:  # Set your threshold here
+                return "Too many connections", 429  # HTTP 429 Too Many Requests
 
 
 def check_file_access(func):
