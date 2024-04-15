@@ -1,19 +1,34 @@
-from flask import Flask, request, render_template, g, redirect, url_for
+from flask import Flask, request, render_template, g, redirect, url_for, session
+from functools import wraps
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import requests
 import re
 import sqlite3
 import os
 
+
+
 app = Flask(__name__)
+
+def dynamic_limit():
+    if app.config['WAF_ENABLED']:
+        return "10/minute"
+
+limiter = Limiter(key_func=get_remote_address)
+limiter.init_app(app)
 
 DATABASE = 'database.db'
-from flask import Flask, request, render_template, redirect, url_for, session
-from functools import wraps
 
-app = Flask(__name__)
 
 # WAF State: Initially deactivated
 app.config['WAF_ENABLED'] = False
+
+
+@app.before_request
+@limiter.limit(dynamic_limit, error_message="Too many requests. Please try again later.")
+def before_request():
+    pass
 
 def check_waf(func):
     """Decorator to check requests if WAF is enabled."""
