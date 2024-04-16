@@ -156,14 +156,9 @@ def load_file():
     file_path = os.path.abspath(os.path.join(base_directory, filename))
 
     if file_path.startswith(base_directory) and os.path.isfile(file_path):
-        try:
-            with open(file_path, 'r') as file:
-                content = file.read()
-            return content
-        except Exception as e:
-            return f"Error: {str(e)}"
-    else:
-        return "File not found or access denied"
+        with open(file_path, 'r') as file:
+            content = file.read()
+        return content
 
 
 # Simulate a simple comment page and check for XSS
